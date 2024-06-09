@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.charset.Charset;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -24,6 +25,7 @@ public class Diretorio {
     }
 
     public Diretorio(String argumento) {
+
         this.diretorioAtual = new File(argumento);
         this.loopNaPasta();
     }
@@ -51,7 +53,8 @@ public class Diretorio {
                 }
                 if (argumentos[1] != null) {
                     diretorioDestino = new File(argumentos[1]);
-                    System.out.println("Destino: " + argumentos[1]);
+                    System.out.println("Lendo de: " + argumentos[0]);
+                    System.out.println("Escrevendo em: " + argumentos[1]);
                 }
             }
         }
@@ -76,21 +79,36 @@ public class Diretorio {
         for (File f : diretorioAtual.listFiles()) {
 
             if (mostraSaida) {
-                System.out.println(f.getName());
+                //System.out.println(f.getName());
             }
 
             if (f.isDirectory()) {
                 numeroPastas++;
+
+                if (mostraSaida) {
+                    System.out.println("\n============================================================================================\n"
+                            + "[--]Pasta processada: " + f.getName());
+                }
+                this.separarEmGrupos(f, diretorioDestino);
+
             } else {
                 contaArquivos++;
                 System.out.print(100 * contaArquivos / numeroArquivos + "%\r");
+
+                if (mostraSaida) {
+
+                    System.out.println("\n============================================================================================\n"
+                            + "[-]Arquivo processado: " + f.getName());
+                }
                 this.separarEmGrupos(f, diretorioDestino);
             }
         }
 
         //Quando terminar o loop, escreve o CSV
         if (mostraSaida) {
-            System.out.println("Encontradas " + numeroPastas + " pastas e " + numeroArquivos + " arquivos. ");
+            System.out.println("Encontradas "
+                    + numeroPastas + " pastas e " + numeroArquivos
+                    + " arquivos. \n============================================================================================");
         }
         this.gerarSaidaCSV();
 
@@ -99,7 +117,7 @@ public class Diretorio {
     private void separarEmGrupos(File arquivoOrigem, File diretorioDestino) {
 
         if (mostraSaida) {
-            System.out.println("Tamanho da lista CSV " + Grupos.listaSaidaCSV.size());
+            System.out.println("Dados no log de saída: " + Grupos.listaSaidaCSV.size());
         }
         new Grupos(arquivoOrigem, diretorioDestino);
 
@@ -115,7 +133,7 @@ public class Diretorio {
 
             String pastaExecutavel = new File(this.getClass().getProtectionDomain().getCodeSource().getLocation().toURI()).getParent();
             File arquivoSaida = new File(pastaExecutavel + "\\Lista.csv");
-            System.out.println("User dir " + arquivoSaida);
+            //System.out.println("User dir " + arquivoSaida);
 
             fw = new FileWriter(arquivoSaida);
             bw = new BufferedWriter(fw);
