@@ -1,12 +1,16 @@
 package adam.cli;
 
 import adam.cli.N1710.Grupos;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -78,16 +82,12 @@ public class Diretorio {
 
         for (File f : diretorioAtual.listFiles()) {
 
-            if (mostraSaida) {
-                //System.out.println(f.getName());
-            }
-
             if (f.isDirectory()) {
                 numeroPastas++;
 
                 if (mostraSaida) {
                     System.out.println("\n============================================================================================\n"
-                            + "[--]Pasta processada: " + f.getName());
+                            + "Pasta processada: " + f.getName());
                 }
                 this.separarEmGrupos(f, diretorioDestino);
 
@@ -98,17 +98,10 @@ public class Diretorio {
                 if (mostraSaida) {
 
                     System.out.println("\n============================================================================================\n"
-                            + "[-]Arquivo processado: " + f.getName());
+                            + "Arquivo processado: " + f.getName());
                 }
                 this.separarEmGrupos(f, diretorioDestino);
             }
-        }
-
-        //Quando terminar o loop, escreve o CSV
-        if (mostraSaida) {
-            System.out.println("Encontradas "
-                    + numeroPastas + " pastas e " + numeroArquivos
-                    + " arquivos. \n============================================================================================");
         }
         this.gerarSaidaCSV();
 
@@ -116,10 +109,10 @@ public class Diretorio {
 
     private void separarEmGrupos(File arquivoOrigem, File diretorioDestino) {
 
+        new Grupos(arquivoOrigem, diretorioDestino);
         if (mostraSaida) {
             System.out.println("Dados no log de saída: " + Grupos.listaSaidaCSV.size());
         }
-        new Grupos(arquivoOrigem, diretorioDestino);
 
     }
 
@@ -132,26 +125,65 @@ public class Diretorio {
         try {
 
             String pastaExecutavel = new File(this.getClass().getProtectionDomain().getCodeSource().getLocation().toURI()).getParent();
+            Path nomeArquivo = Paths.get(pastaExecutavel + "\\Lista.csv");
             File arquivoSaida = new File(pastaExecutavel + "\\Lista.csv");
-            //System.out.println("User dir " + arquivoSaida);
 
-            fw = new FileWriter(arquivoSaida);
-            bw = new BufferedWriter(fw);
+            //Se, dado o caminho é constatado que já existe o arquivo:
+            if (Files.exists(nomeArquivo)) {
+                System.out.println("O arquivo já existe. Conferindo se já existe conteúdo...");
+                FileReader fr = new FileReader(arquivoSaida);
+                BufferedReader br = new BufferedReader(fr);
 
-            bw.write("Nome_Original;G0;G1;G2;G3;G4;G5;G6;G7;SIGEM_A;SIGEM_B;Sistema;Pasta_Final;Link\r\n");
+                //Testa se há cabeçalho. Se não houver, cria-se um.
+                if (br.readLine() == null) {
 
-            for (String s : Grupos.listaSaidaCSV) {
-                bw.write(s);
+                    br.close();
+                    fr.close();
+
+                    System.out.println("Não existe cabeçalho. Escrevendo primeira linha...");
+                    //O parâmetro true faz append no arquivo
+                    fw = new FileWriter(arquivoSaida, true);
+                    bw = new BufferedWriter(fw);
+
+                    bw.write("Nome_Original;G0_Linguagem;G1_Categoria;G2_Projeto;G3_Sistema;G4_Classe;G5_Vendor;G6;G7_Versao;Data;Link\r\n");
+                    bw.close();
+                    fw.close();
+                    gerarSaidaCSV();
+
+                } else {
+                    System.out.println("O arquivo existe com conteúdo. Adicionando...");
+                    fw = new FileWriter(arquivoSaida, true);
+                    bw = new BufferedWriter(fw);
+
+                    for (String s : Grupos.listaSaidaCSV) {
+                        bw.write(s);
+                    }
+
+                    bw.close();
+                    fw.close();
+                }
+
+                //Não existe o arquivo. Cria-se um    
+            } else {
+                System.out.println("O arquivo não existe. Criando...");
+                arquivoSaida = new File(pastaExecutavel + "\\Lista.csv");
+
+                fw = new FileWriter(arquivoSaida, true);
+                bw = new BufferedWriter(fw);
+
+                bw.close();
+                fw.close();
+
+                //Após gerado o arquivo, retorna ao início do método.
+                gerarSaidaCSV();
+
             }
 
-            bw.close();
-            fw.close();
-
         } catch (IOException e) {
+            System.out.println("Erro " + e);
         } catch (URISyntaxException ex) {
             Logger.getLogger(Diretorio.class.getName()).log(Level.SEVERE, null, ex);
         }
-
     }
 
 }
