@@ -67,7 +67,6 @@ async function pesquisas(numeroSkip, token, projeto) {
       });
     });
 
-    console.log('Matriz online:', matrizArquivosOnline.length);
     return matrizArquivosOnline;
 
   } catch (error) {

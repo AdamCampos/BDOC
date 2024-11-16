@@ -15,7 +15,6 @@ async function pegaID(termo, token, index) {
         'Authorization': token,
       }
     }).then((response) => {
-      console.log('resposta ID', response.data.value[0].Title, index);
       resolve(response.data.value[0]);
     }).catch(() => {
       resolve(undefined);
