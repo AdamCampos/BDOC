@@ -3,10 +3,10 @@ const express = require('express');
 const router = express.Router();
 const { initializeBrowser } = require('./services/browserService'); // Inicializa o navegador para automação
 const { verificaToken } = require('./services/authService'); // Verifica a validade do token de autenticação
-const { gerenciador, comparaArquivos } = require('./services/fileService'); // Gerencia arquivos offline e compara arquivos online e offline
+const { gerenciador, comparaArquivos, formatarTamanhoTotal } = require('./services/fileService'); // Gerencia arquivos offline e compara arquivos online e offline
 const { pegaID } = require('./services/idService'); // Obtém ID associado a um arquivo específico
 const { pegaOBID } = require('./services/obidService'); // Obtém OBID, que pode representar uma identificação específica de um documento
-const { pegaURI, formatarTamanhoTotal } = require('./services/uriService'); // Obtém URI de um arquivo e formata o tamanho total dos arquivos
+const { pegaURI } = require('./services/uriService'); // Obtém URI de um arquivo e formata o tamanho total dos arquivos
 const { iniciaBuscaSkips } = require('./services/searchService'); // Inicia busca por arquivos online
 const { downloadLinks } = require('./services/downloadService'); // Gera links de download para arquivos processados
 const { reset } = require('./utils/helpers'); // Reseta variáveis ou estados no início da execução
@@ -67,6 +67,7 @@ async function main() {
     console.log('Matriz comparação:', matrizComparaArquivos.length);
 
     // Define o intervalo de índice para processamento específico dos arquivos comparados
+    //Isto é útil quando queremos processar só uma parte da matriz. 
     const ordem = 1;
     const fator = 10;
 
@@ -117,28 +118,55 @@ async function main() {
         })
     );
 
-    matrizURIs = uriResults
-      .filter(result => {
-        if (result.status !== 'fulfilled') {
-        }
-        return result.status === 'fulfilled' && result.value;
-      })
-      .flatMap(result => {
-        const uris = result.value; // Recebe o array de URIs
-        return uris.map(uri => {
+    const LIMITE_GB = 5; // Limite em GB
+    const LIMITE_BYTES = LIMITE_GB * 1024 * 1024 * 1024; // Limite convertido para bytes
+
+    const resultadoFinal = []; // Armazena os itens processados
+    let tamanhoTotal = 0; // Acumulador de tamanho total
+
+    for (const result of uriResults) {
+
+      if (result.status === 'fulfilled' && result.value) {
+        const uris = result.value;
+
+        for (const uri of uris) {
+          // Verifica se já atingiu o limite
+          if (tamanhoTotal >= LIMITE_BYTES) {
+            break;
+          }
+
           // Verifica e acumula o tamanho total de cada URI
           if (uri.Tamanho && !isNaN(uri.Tamanho)) {
-            tamanhoTotal += (1 * uri.Tamanho); // Adiciona o tamanho de cada arquivo à soma total
-          } else {
+            tamanhoTotal += (1 * uri.Tamanho); // Soma o tamanho ao total acumulado
           }
-          // Retorna a estrutura de dados desejada
-          const extMatch = uri.URI.match(/.*\.(\w+)$/); // Extrai a extensão do arquivo
-          return [uri.URI, `${uri.Name}_${uri.Revision}_PARTE_${uri.Parte}`, uri.Title.toUpperCase(), extMatch ? extMatch[1].toLowerCase() : ''];
-        });
 
-      });
+          const extMatch = uri.URI.match(/.*\.(\w+)$/); // Extrai a extensão do arquivo
+
+          // Adiciona o item ao resultado final
+          resultadoFinal.push([
+            uri.URI,
+            `${uri.Name}_${uri.Revision}_PARTE_${uri.Parte}`,
+            uri.Title.toUpperCase(),
+            extMatch ? extMatch[1].toLowerCase() : ''
+          ]);
+
+          // Verifica novamente após adicionar
+          if (tamanhoTotal >= LIMITE_BYTES) {
+            console.log(`Limite de ${LIMITE_GB} GB atingido. Parando o processamento.`);
+            break;
+          }
+        }
+
+        // Interrompe o processamento global após o limite
+        if (tamanhoTotal >= LIMITE_BYTES) break;
+      }
+    }
+
+    matrizURIs = resultadoFinal; // Atualiza a matriz com os itens processados
 
     console.log('Tamanho total dos arquivos:', formatarTamanhoTotal(tamanhoTotal)); // Exibe o tamanho total formatado
+
+
 
     // Inicializa a variável `listaFinal` com base no projeto atual para compor os links de download
     let listaFinal = '';
@@ -168,9 +196,6 @@ async function main() {
     if (browser) {
       console.log('Terminando e fechando navegador.');
       await browser.close();
-
-
-
     }
   }
 }

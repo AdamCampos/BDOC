@@ -35,15 +35,15 @@ async function downloadLinks(listaFinal, projeto) {
     await executarScriptPowerShell(path.join(origem, 'listaDownload.ps1'));
     agora();
 
-    // console.log('Inicia expansão');
-    // // Após o download, executa o script de extração
-    // await executarScriptPowerShell(path.join(origem, 'expandClear7.ps1'));
-    // agora();
+    console.log('Inicia expansão');
+    // Após o download, executa o script de extração
+    await executarScriptPowerShell(path.join(origem, 'expandClear7.ps1'));
+    agora();
 
-    // console.log('Inicia junção de PARTES');
-    // // Após a expansão, executa a criação de pastas e movimentação dos arquivos
-    // await executarScriptPowerShell(path.join(origem, 'ajustePartes.ps1'));
-    // agora();
+    console.log('Inicia junção de PARTES');
+    // Após a expansão, executa a criação de pastas e movimentação dos arquivos
+    await executarScriptPowerShell(path.join(origem, 'ajustePartes.ps1'));
+    agora();
     
     // console.log('Inicia cópia local');
     // // Após a expansão, executa o script de cópia (local)
