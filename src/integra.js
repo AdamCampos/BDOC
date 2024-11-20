@@ -44,7 +44,7 @@ async function main() {
 
   try {
     // Carrega a matriz de arquivos offline da pasta raiz
-    //matrizArquivosOffline = await gerenciador(raiz);
+    matrizArquivosOffline = await gerenciador(raiz);
 
     // Inicializa o navegador e realiza autenticação para obter o token de acesso
     browser = await initializeBrowser();
@@ -68,7 +68,7 @@ async function main() {
 
     // Define o intervalo de índice para processamento específico dos arquivos comparados
     const ordem = 1;
-    const fator = 100;
+    const fator = 10;
 
     const indiceInicio = (1 * (ordem - 1) * fator);   // Ponto de início do intervalo
     const indiceFim = (1 * ordem * fator);      // Ponto de término do intervalo
