@@ -44,7 +44,7 @@ async function main() {
 
   try {
     // Carrega a matriz de arquivos offline da pasta raiz
-    matrizArquivosOffline = await gerenciador(raiz);
+    //matrizArquivosOffline = await gerenciador(raiz);
 
     // Inicializa o navegador e realiza autenticação para obter o token de acesso
     browser = await initializeBrowser();
@@ -67,8 +67,11 @@ async function main() {
     console.log('Matriz comparação:', matrizComparaArquivos.length);
 
     // Define o intervalo de índice para processamento específico dos arquivos comparados
-    const indiceInicio = 500;   // Ponto de início do intervalo
-    const indiceFim = 800;      // Ponto de término do intervalo
+    const ordem = 1;
+    const fator = 100;
+
+    const indiceInicio = (1 * (ordem - 1) * fator);   // Ponto de início do intervalo
+    const indiceFim = (1 * ordem * fator);      // Ponto de término do intervalo
 
     // Seleciona um subconjunto da matriz de comparação para processamento
     const limiteDeItens = matrizComparaArquivos.slice(indiceInicio, indiceFim);
@@ -81,11 +84,13 @@ async function main() {
       })
     );
 
-    // Processa os OBIDs a partir dos resultados dos IDs obtidos
     const obidResults = await Promise.allSettled(
       idResults
         .filter(retornoId => retornoId.status === 'fulfilled' && retornoId.value) // Filtra apenas resultados bem-sucedidos
-        .map(retornoId => limit(() => pegaOBID(retornoId.value.Id, retornoId.value, bearerToken)))
+        .map(async retornoId => {
+          const result = await limit(() => pegaOBID(retornoId.value.Id, retornoId.value, bearerToken));
+          return result;
+        })
     );
 
     // Constrói a matriz de OBIDs a partir dos resultados bem-sucedidos
@@ -95,23 +100,42 @@ async function main() {
 
     console.log('OBIDs processados:', matrizOBIDs.length);
 
-    // Processa as URIs a partir dos OBIDs
     const uriResults = await Promise.allSettled(
       matrizOBIDs
-        .filter(obid => obid) // Filtra resultados válidos
-        .map(obid => limit(() => pegaURI(obid[0], obid, bearerToken)))
+        .filter(obid => {
+          const isValid = Boolean(obid);
+          return isValid; // Filtra resultados válidos
+        })
+        .map(async obid => {
+          try {
+            const resultado = await limit(() => pegaURI(obid[0], obid, bearerToken));
+            return resultado;
+          } catch (error) {
+            console.error('Erro ao processar pegaURI para OBID', obid[0], ':', error.message);
+            throw error;
+          }
+        })
     );
 
-    // Constrói a matriz de URIs e calcula o tamanho total dos arquivos
     matrizURIs = uriResults
-      .filter(result => result.status === 'fulfilled' && result.value)
-      .map(result => {
-        const uri = result.value;
-        if (uri[3] && !isNaN(uri[3])) { // Verifica se o tamanho é um número válido
-          tamanhoTotal += (1 * uri[3]); // Adiciona o tamanho de cada arquivo à soma total
+      .filter(result => {
+        if (result.status !== 'fulfilled') {
         }
-        const extMatch = uri[0].Uri.match(/.*\.(\w+)$/); // Extrai a extensão do arquivo
-        return [uri[0].Uri, uri[2].Name + '_' + uri[2].Revision, uri[2].Title.toUpperCase(), extMatch ? extMatch[1] : ''];
+        return result.status === 'fulfilled' && result.value;
+      })
+      .flatMap(result => {
+        const uris = result.value; // Recebe o array de URIs
+        return uris.map(uri => {
+          // Verifica e acumula o tamanho total de cada URI
+          if (uri.Tamanho && !isNaN(uri.Tamanho)) {
+            tamanhoTotal += (1 * uri.Tamanho); // Adiciona o tamanho de cada arquivo à soma total
+          } else {
+          }
+          // Retorna a estrutura de dados desejada
+          const extMatch = uri.URI.match(/.*\.(\w+)$/); // Extrai a extensão do arquivo
+          return [uri.URI, `${uri.Name}_${uri.Revision}_PARTE_${uri.Parte}`, uri.Title.toUpperCase(), extMatch ? extMatch[1].toLowerCase() : ''];
+        });
+
       });
 
     console.log('Tamanho total dos arquivos:', formatarTamanhoTotal(tamanhoTotal)); // Exibe o tamanho total formatado
@@ -119,17 +143,22 @@ async function main() {
     // Inicializa a variável `listaFinal` com base no projeto atual para compor os links de download
     let listaFinal = '';
 
-    if(projeto === '82'){
+    if (projeto === '82') {
       listaFinal = matrizURIs.map(uri => `\n@{url = "${uri[0]}"; path = "D:\\BDOC 82\\Desordenado\\${uri[1]}.${uri[3]}"}`);
     }
-    else if(projeto === '83'){
+    else if (projeto === '83') {
       listaFinal = matrizURIs.map(uri => `\n@{url = "${uri[0]}"; path = "D:\\BDOC\\Desordenado\\${uri[1]}.${uri[3]}"}`);
     }
 
     // Gera os links de download e salva em um arquivo
-    downloadLinks(listaFinal, projeto);
+    await downloadLinks(listaFinal, projeto);
     etapa9 = performance.now(); // Marca o fim do processo
     console.log('Total:', Math.ceil((etapa9 - etapa1) / 60000) + 'min'); // Exibe o tempo total de execução
+    // Verifica se a matrizComparaArquivos tem mais de 200 itens e reinicia o processo
+    // if (matrizComparaArquivos.length > 200) {
+    //   console.log('Há mais de 200 itens restantes na matrizComparaArquivos. Reiniciando o ciclo...');
+    //   await main(); // Reinicia o ciclo chamando a função main novamente
+    // }
 
   } catch (error) {
     // Captura e exibe erros que ocorrerem durante a execução
@@ -139,6 +168,9 @@ async function main() {
     if (browser) {
       console.log('Terminando e fechando navegador.');
       await browser.close();
+
+
+
     }
   }
 }

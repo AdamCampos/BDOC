@@ -32,33 +32,38 @@ async function downloadLinks(listaFinal, projeto) {
     agora();
     console.log('Inicia download');
     // Executa o script listaDownload.ps1 para realizar o download dos arquivos
-    await executarScriptPowerShell(caminhoSaida);
+    await executarScriptPowerShell(path.join(origem, 'listaDownload.ps1'));
     agora();
 
-    console.log('Inicia expansão');
-    // Após o download, executa o script de extração
-    await executarScriptPowerShell(path.join(origem, 'expandClear7.ps1'));
-    agora();
+    // console.log('Inicia expansão');
+    // // Após o download, executa o script de extração
+    // await executarScriptPowerShell(path.join(origem, 'expandClear7.ps1'));
+    // agora();
 
-    console.log('Inicia cópia local');
-    // Após a expansão, executa o script de cópia (local)
-    await executarScriptPowerShell(path.join(origem, 'robo1.ps1'));
-    agora();
+    // console.log('Inicia junção de PARTES');
+    // // Após a expansão, executa a criação de pastas e movimentação dos arquivos
+    // await executarScriptPowerShell(path.join(origem, 'ajustePartes.ps1'));
+    // agora();
+    
+    // console.log('Inicia cópia local');
+    // // Após a expansão, executa o script de cópia (local)
+    // await executarScriptPowerShell(path.join(origem, 'robo1.ps1'));
+    // agora();
 
-    console.log('Inicia cópia P-83');
-    // Após a expansão, executa o script de cópia (P83)
-    await executarScriptPowerShell(path.join(origem, 'robo2.ps1'));
-    agora();
+    // console.log('Inicia cópia P-83');
+    // // Após a expansão, executa o script de cópia (P83)
+    // await executarScriptPowerShell(path.join(origem, 'robo2.ps1'));
+    // agora();
 
-    console.log('Inicia cópia P-80');
-    // Após a expansão, executa o script de cópia (P80)
-    await executarScriptPowerShell(path.join(origem, 'robo3.ps1'));
-    agora();
+    // console.log('Inicia cópia P-80');
+    // // Após a expansão, executa o script de cópia (P80)
+    // await executarScriptPowerShell(path.join(origem, 'robo3.ps1'));
+    // agora();
 
-    console.log('Inicia limpeza');
-    // Após as cópias, deleta o conteúdo
-    await executarScriptPowerShell(path.join(origem, 'deletaDesordenado.ps1'));
-    agora();
+    // console.log('Inicia limpeza');
+    // // Após as cópias, deleta o conteúdo
+    // await executarScriptPowerShell(path.join(origem, 'deletaDesordenado.ps1'));
+    // agora();
 
     console.log('Limpeza finalizada');
   } catch (error) {
