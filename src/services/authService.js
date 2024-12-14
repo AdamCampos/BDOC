@@ -13,6 +13,7 @@ function calculaToken(token) {
   const { exp } = JSON.parse(jsonPayload);
   const expiraEm = ((((exp * 1000) - Date.now()) / 60000).toFixed(0));
 
+  console.log('Token:', expiraEm);
   return expiraEm;
 }
 

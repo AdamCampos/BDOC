@@ -3,3 +3,4 @@ node_modules/
 /chrome/
 chrome/
 .vscode/
+api/Default/Cache/Cache_Data/*

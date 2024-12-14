@@ -13,7 +13,15 @@ async function downloadLinks(listaFinal, projeto) {
     throw new Error('A lista de arquivos para download está vazia ou inválida.');
   }
 
-  let append = '\n$workers = foreach ($f in $files) {\n$wc = New-Object System.Net.WebClient \nWrite-Output $wc.DownloadFileTaskAsync($f.url, $f.path) \n}\n$workers.Result';
+
+  let append = `
+$workers = foreach ($f in $files) {
+$wc = New-Object System.Net.WebClient 
+Write-Output $wc.DownloadFileTaskAsync($f.url, $f.path) 
+}
+$workers.Result
+`;
+
   let origem = '';
 
   if (projeto === '83') {
@@ -53,7 +61,7 @@ async function downloadLinks(listaFinal, projeto) {
     if (projeto === 82) {
       console.log('Inicia cópia P-82');
       // Após a expansão, executa o script de cópia (P83)
-      await executarScriptPowerShell(path.join(origem, 'robo2.ps1'));
+      // await executarScriptPowerShell(path.join(origem, 'robo2.ps1'));
       agora();
     }
     else if (projeto === 83) {

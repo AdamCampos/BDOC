@@ -28,7 +28,9 @@ async function getDevToolsData(browser, url) {
   });
 
   page.on('response', response => {
+
     if (response.url().includes('https://integra-ext.petrobras.com.br/samext/oauth/connect/authorize')) {
+      console.log(response);
       console.log('Redirecionamento detectado, reiniciando o programa...');
       redirecionado = true;
     }

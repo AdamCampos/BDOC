@@ -18,7 +18,8 @@ async function downloadImage(url, filename) {
       url, // URL da imagem
       method: 'GET', // Método HTTP
       responseType: 'stream', // Recebe a resposta como um stream
-      httpsAgent: agent // Utiliza o agente configurado para ignorar SSL
+      httpsAgent: agent, // Utiliza o agente configurado para ignorar SSL
+      timeout: 120000 // Timeout em milissegundos (exemplo: 5000ms = 5 segundos)
     });
     return new Promise((resolve, reject) => {
       const writer = fs.createWriteStream(filename); // Cria um stream de escrita no arquivo
@@ -33,8 +34,9 @@ async function downloadImage(url, filename) {
 
 // Função principal para realizar o scraping
 async function main() {
-  const url = 'https://localizadorpessoas.petrobras.com.br/lope/busca/buscar.do?ordenacao=0D&filtered=false&aba=F&unico=P-80/geplat&advanced=false&pagina=5';
+  //const url = 'https://localizadorpessoas.petrobras.com.br/lope/busca/buscar.do?ordenacao=0D&filtered=false&aba=F&unico=P-80/geplat&advanced=false&pagina=5';
 
+  const url = 'https://localizadorpessoas.petrobras.com.br/lope/busca/resultados.do?filtered=true&cleanAll=false&advanced=true&chave=&matricula=&nome=&lotacao=BUZIOS%2FPPO%2FIPO%2FPRE-OP-P80&opcaoBuscaLotacao=exata&cargo=&enfase=&funcao=&ramal=&email=&pais=&empresa=&empresaContratada=&matricialidadeOrgao=&imovel='
   console.log('Iniciando scraping...');
 
   // Cria o diretório para armazenar as imagens, se não existir
@@ -45,9 +47,9 @@ async function main() {
 
   try {
     // Inicia o navegador no modo headless
-    const browser = await puppeteer.launch({ headless: true });
+    const browser = await puppeteer.launch({ headless: false });
     const page = await browser.newPage(); // Abre uma nova aba no navegador
-    await page.goto(url, { waitUntil: 'networkidle2' }); // Acessa a página e aguarda até a rede estar inativa
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 180000}); // Acessa a página e aguarda até a rede estar inativa
 
     const content = await page.content(); // Obtém o conteúdo da página
     const $ = cheerio.load(content); // Carrega o conteúdo no Cheerio para manipulação

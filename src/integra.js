@@ -1,18 +1,28 @@
 // Importando módulos necessários para o funcionamento do aplicativo
+
+// Módulos externos
 const express = require('express');
+const pLimit = require('p-limit'); // Controla a quantidade de promessas simultâneas para evitar sobrecarga
+
+// Configuração do router
 const router = express.Router();
-const { initializeBrowser } = require('./services/browserService'); // Inicializa o navegador para automação
+
+// Serviços locais (ordenados por pasta e nome do arquivo)
 const { verificaToken } = require('./services/authService'); // Verifica a validade do token de autenticação
+const { initializeBrowser } = require('./services/browserService'); // Inicializa o navegador para automação
+const { downloadLinks } = require('./services/downloadService'); // Gera links de download para arquivos processados
+const { getDevToolsData } = require('./services/devToolsService'); // Obtém dados de ferramentas de desenvolvimento para autenticação
 const { gerenciador, comparaArquivos, formatarTamanhoTotal } = require('./services/fileService'); // Gerencia arquivos offline e compara arquivos online e offline
+const { iniciaBuscaSkips } = require('./services/searchService'); // Inicia busca por arquivos online
 const { pegaID } = require('./services/idService'); // Obtém ID associado a um arquivo específico
 const { pegaOBID } = require('./services/obidService'); // Obtém OBID, que pode representar uma identificação específica de um documento
 const { pegaURI } = require('./services/uriService'); // Obtém URI de um arquivo e formata o tamanho total dos arquivos
-const { iniciaBuscaSkips } = require('./services/searchService'); // Inicia busca por arquivos online
-const { downloadLinks } = require('./services/downloadService'); // Gera links de download para arquivos processados
-const { reset } = require('./utils/helpers'); // Reseta variáveis ou estados no início da execução
 const { setaServidor } = require('./services/serverConfigService'); // Configura o servidor para o processo atual
-const { getDevToolsData } = require('./services/devToolsService'); // Obtém dados de ferramentas de desenvolvimento para autenticação
-const pLimit = require('p-limit'); // Controla a quantidade de promessas simultâneas para evitar sobrecarga
+
+// Utilitários
+const { reset, tableLog, displayLogTable } = require('./utils/helpers'); // Reseta variáveis ou estados no início da execução
+
+//==========================================================================================================================================================================//
 
 // Variáveis globais que armazenam dados ao longo da execução do script
 let projeto = '';
@@ -67,65 +77,136 @@ async function main() {
     console.log('Matriz comparação:', matrizComparaArquivos.length);
 
     // Define o intervalo de índice para processamento específico dos arquivos comparados
-    //Isto é útil quando queremos processar só uma parte da matriz. 
-    const ordem = 1;
-    const fator = 10;
+    //Isto é útil quando queremos processar só uma parte da matriz. OffSet é onde a contagem começará. Este valor multiplica de 
+    const offSet = 1;
+    const numeroDeItens = 50;
 
-    const indiceInicio = (1 * (ordem - 1) * fator);   // Ponto de início do intervalo
-    const indiceFim = (1 * ordem * fator);      // Ponto de término do intervalo
+    const indiceInicio = (1 * (offSet - 1) * numeroDeItens);   // Ponto de início do intervalo
+    const indiceFim = (1 * offSet * numeroDeItens);      // Ponto de término do intervalo
 
     // Seleciona um subconjunto da matriz de comparação para processamento
     const limiteDeItens = matrizComparaArquivos.slice(indiceInicio, indiceFim);
 
-    // Mapeia e processa os IDs dos arquivos, com controle de limite de promessas simultâneas
+    // Mapeia e processa os IDs dos arquivos, com controle de limite de tempo entre as promessas
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    //==========================================================================================================================================================================//
+    // [ IDs ]
+
+    console.log(`IDs`);
+
     const idResults = await Promise.allSettled(
-      limiteDeItens.map((item, index) => {
+      limiteDeItens.map(async (item, index) => {
         const nomeSemRevisao = item.split('_').slice(0, -1).join('_'); // Remove a última parte do nome (revisão)
-        return limit(() => pegaID(nomeSemRevisao, bearerToken, index + indiceInicio)); // Adiciona 'indiceInicio' ao 'index' para manter o índice original
+
+        // Atrasa a execução
+        await delay(150 * (index + 1));
+
+        const startTime = performance.now(); // Captura o tempo de início em milissegundos
+        const result = await pegaID(nomeSemRevisao, bearerToken, index + indiceInicio); // Adiciona 'indiceInicio' ao 'index' para manter o índice original
+        const endTime = performance.now(); // Captura o tempo de término em milissegundos
+
+        const duration = (endTime - startTime).toFixed(2); // Calcula a diferença em milissegundos com 2 casas decimais
+
+        // Mostra no console o índice e a duração
+        console.log(`[${index}] Duração: ${duration}ms}`);
+
+        return result;
       })
     );
 
-    const obidResults = await Promise.allSettled(
-      idResults
-        .filter(retornoId => retornoId.status === 'fulfilled' && retornoId.value) // Filtra apenas resultados bem-sucedidos
-        .map(async retornoId => {
-          const result = await limit(() => pegaOBID(retornoId.value.Id, retornoId.value, bearerToken));
-          return result;
-        })
-    );
+    //==========================================================================================================================================================================//
+    // [ OBIDs ]
+
+    console.log(`OBIDs`);
+
+    const obidResults = [];
+    let loopStartTime = performance.now(); // Tempo de início do loop
+
+    for (let index = 0; index < idResults.length; index++) {
+      const retornoId = idResults[index];
+
+      if (retornoId.status === 'fulfilled' && retornoId.value) {
+        // Usando setTimeout para aguardar o delay
+        await delay(150 * (index + 1)); // Delay sequencial baseado no índice
+
+        try {
+          // Executa a função assíncrona e aguarda o resultado
+          const result = await limit(() =>
+            pegaOBID(retornoId.value.Id, retornoId.value, bearerToken)
+          );
+
+          const currentTime = performance.now(); // Tempo atual
+          const durationFromLoopStart = (0.001 * (currentTime - loopStartTime)).toFixed(2); // Diferença desde o início do loop
+
+          // Extrai o campo Name do resultado, se existir
+          const name = Array.isArray(result) && result[1]?.Name ? result[1].Name : "N/A";
+
+          // Mostra no console o índice, a duração desde o início do loop, e o Name
+          console.log(`[${index}] Duração: ${durationFromLoopStart}s, Name: ${name}`);
+
+          // Adiciona o resultado com status ao array
+          obidResults.push({ status: 'fulfilled', value: result });
+        } catch (error) {
+          console.error(`[${index}] Erro ao processar pegaOBID: ${error.message}`);
+          obidResults.push({ status: 'rejected', reason: error });
+        }
+      }
+    }
 
     // Constrói a matriz de OBIDs a partir dos resultados bem-sucedidos
-    matrizOBIDs = obidResults
-      .filter(result => result.status === 'fulfilled' && result.value)
-      .map(result => result.value);
+    const matrizOBIDs = obidResults
+      .filter(result => result.status === 'fulfilled' && result.value) // Verifica o status e valor
+      .map(result => result.value); // Extrai o valor do resultado
 
     console.log('OBIDs processados:', matrizOBIDs.length);
 
+
+    //==========================================================================================================================================================================//
+    // [ URIs ]
+
+    loopStartTime = performance.now(); // Tempo de início do loop
     const uriResults = await Promise.allSettled(
       matrizOBIDs
         .filter(obid => {
-          const isValid = Boolean(obid);
-          return isValid; // Filtra resultados válidos
+          // Garante que obid seja um array e tenha o primeiro elemento
+          const isValid = Array.isArray(obid) && obid.length > 0;
+          return isValid;
         })
-        .map(async obid => {
+        .map(async (obid, index) => {
+          // Atrasa a execução em 150ms por índice
+          await delay(150 * (index + 1));
+
+          const startTime = performance.now(); // Captura o tempo de início para cada iteração
+
           try {
+            // Executa a função assíncrona e aguarda o resultado
             const resultado = await limit(() => pegaURI(obid[0], obid, bearerToken));
+
+            const endTime = performance.now(); // Captura o tempo de término para cada iteração
+            const durationFromLoopStart = (0.001 * (endTime - loopStartTime)).toFixed(2); // Diferença desde o início do loop
+
+            // Mostra no console o índice, o OBID processado e o tempo de execução desde o início do loop
+            console.log(
+              `[${index}] Duração: ${durationFromLoopStart}s, OBID: ${obid[0]}`
+            );
+
             return resultado;
           } catch (error) {
-            console.error('Erro ao processar pegaURI para OBID', obid[0], ':', error.message);
+            console.error(`[${index}] Erro ao processar pegaURI para OBID: ${obid[0]} - ${error.message}`);
             throw error;
           }
         })
     );
 
-    const LIMITE_GB = 5; // Limite em GB
+    console.log('Resultados URI processados:', uriResults.length);
+
+    const LIMITE_GB = 4; // Limite em GB
     const LIMITE_BYTES = LIMITE_GB * 1024 * 1024 * 1024; // Limite convertido para bytes
 
     const resultadoFinal = []; // Armazena os itens processados
     let tamanhoTotal = 0; // Acumulador de tamanho total
 
     for (const result of uriResults) {
-
       if (result.status === 'fulfilled' && result.value) {
         const uris = result.value;
 
@@ -140,14 +221,25 @@ async function main() {
             tamanhoTotal += (1 * uri.Tamanho); // Soma o tamanho ao total acumulado
           }
 
-          const extMatch = uri.URI.match(/.*\.(\w+)$/); // Extrai a extensão do arquivo
+          let extMatch = '';
+          try {
+            // Verifica se a URI existe antes de tentar acessar
+            if (uri.URI) {
+              extMatch = uri.URI.match(/.*\.(\w+)$/); // Extrai a extensão do arquivo
+            } else {
+              console.warn(`Aviso: URI ausente em: ${JSON.stringify(uri)}`);
+            }
+          } catch (error) {
+            console.error(`Erro ao extrair extensão da URI: ${uri.URI}. Detalhes: ${error.message}`);
+            extMatch = null; // Define como nulo em caso de erro
+          }
 
           // Adiciona o item ao resultado final
           resultadoFinal.push([
-            uri.URI,
+            uri.URI || '', // Garante que não insira `undefined`
             `${uri.Name}_${uri.Revision}_PARTE_${uri.Parte}`,
-            uri.Title.toUpperCase(),
-            extMatch ? extMatch[1].toLowerCase() : ''
+            uri.Title ? uri.Title.toUpperCase() : '', // Garante que Title existe
+            extMatch ? extMatch[1].toLowerCase() : '' // Se não houver correspondência, retorna string vazia
           ]);
 
           // Verifica novamente após adicionar
@@ -163,10 +255,8 @@ async function main() {
     }
 
     matrizURIs = resultadoFinal; // Atualiza a matriz com os itens processados
-
+    console.log('Matriz URI:', matrizURIs.length);
     console.log('Tamanho total dos arquivos:', formatarTamanhoTotal(tamanhoTotal)); // Exibe o tamanho total formatado
-
-
 
     // Inicializa a variável `listaFinal` com base no projeto atual para compor os links de download
     let listaFinal = '';
@@ -181,12 +271,40 @@ async function main() {
     // Gera os links de download e salva em um arquivo
     await downloadLinks(listaFinal, projeto);
     etapa9 = performance.now(); // Marca o fim do processo
-    console.log('Total:', Math.ceil((etapa9 - etapa1) / 60000) + 'min'); // Exibe o tempo total de execução
-    // Verifica se a matrizComparaArquivos tem mais de 200 itens e reinicia o processo
-    // if (matrizComparaArquivos.length > 200) {
-    //   console.log('Há mais de 200 itens restantes na matrizComparaArquivos. Reiniciando o ciclo...');
-    //   await main(); // Reinicia o ciclo chamando a função main novamente
-    // }
+
+    // Substitua os console.log por tableLog
+    tableLog('Projeto', `P-${projeto}`);
+    tableLog('Matriz online', matrizArquivosOnline.length);
+    tableLog('Matriz offline', `${matrizArquivosOffline.length} (${(100 * (matrizArquivosOffline.length / matrizArquivosOnline.length)).toFixed(3)}%)`);
+    tableLog('Matriz comparação', matrizComparaArquivos.length);
+    tableLog('OBIDs processados', matrizOBIDs.length);
+    tableLog('Matriz URI', matrizURIs.length);
+    tableLog('Tamanho total dos arquivos', formatarTamanhoTotal(tamanhoTotal));
+    tableLog('Tempo total', `${Math.ceil((etapa9 - etapa1) / 60000)}min`);
+    tableLog('-----------------------------', '-----------------------------');
+    // Exiba os logs no final do processo
+    displayLogTable();
+
+    // Verifica se matrizComparaArquivos é maior que 200
+    if (matrizComparaArquivos.length > 200) {
+      console.log('MatrizComparaArquivos contém mais de 200 itens. Reiniciando o processo.');
+
+      // Fecha o navegador
+      if (browser) {
+        console.log('Fechando o navegador...');
+        await browser.close();
+      }
+
+      // Aguarda 1 minuto antes de reiniciar
+      console.log('Aguardando 1 minuto antes de reiniciar o processo...');
+      await new Promise(resolve => setTimeout(resolve, 60000)); // Pausa de 1 minuto
+
+      // Reinicia o processo chamando main novamente
+      console.log('Reiniciando o processo...');
+      await main(); // Chama a função main novamente
+    } else {
+      console.log('Processo finalizado. MatrizComparaArquivos contém 200 itens ou menos.');
+    }
 
   } catch (error) {
     // Captura e exibe erros que ocorrerem durante a execução

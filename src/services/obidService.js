@@ -33,7 +33,7 @@ async function pegaOBID(id, item, token) {
         resolve(undefined); // Retorna undefined se nenhum item for encontrado
       }
     }).catch((error) => {
-      console.error(`Erro ao buscar OBID para ID ${id}:`, error);
+      console.error(`Erro ao buscar OBID para ID ${id}:`);
       resolve(undefined);
     });
   });
