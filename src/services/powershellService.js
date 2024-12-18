@@ -9,10 +9,10 @@ async function executarScriptPowerShell(scriptPath) {
     const { stdout, stderr } = await execAsync(command);
 
     if (stderr) {
-      console.error(`Erro de execução: ${stderr}`);
+      //console.error(`Erro de execução: ${stderr}`);
     }
 
-    console.log(`Saída:\n${stdout}`);
+    //console.log(`Saída:\n${stdout}`);
   } catch (error) {
     console.error(`Erro ao executar o script: ${error.message}`);
   }

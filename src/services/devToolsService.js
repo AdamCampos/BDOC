@@ -36,12 +36,12 @@ async function getDevToolsData(browser, url) {
     }
   });
 
-  await page.goto(url, { timeout: 60000 });
+  await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
-  if (redirecionado) {
-    await browser.close();
-    throw new Error('Redirecionamento detectado, reiniciando...');
-  }
+  // if (redirecionado) {
+  //   await browser.close();
+  //   throw new Error('Redirecionamento detectado, reiniciando...');
+  // }
 
   await PromiseTimeout(120000);
   await salvaCookies(page);

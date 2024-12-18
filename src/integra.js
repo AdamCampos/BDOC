@@ -10,7 +10,7 @@ const router = express.Router();
 // Serviços locais (ordenados por pasta e nome do arquivo)
 const { verificaToken } = require('./services/authService'); // Verifica a validade do token de autenticação
 const { initializeBrowser } = require('./services/browserService'); // Inicializa o navegador para automação
-const { downloadLinks } = require('./services/downloadService'); // Gera links de download para arquivos processados
+const { downloadLinks } = require('./services/powershell'); // Gera links de download para arquivos processados
 const { getDevToolsData } = require('./services/devToolsService'); // Obtém dados de ferramentas de desenvolvimento para autenticação
 const { gerenciador, comparaArquivos, formatarTamanhoTotal } = require('./services/fileService'); // Gerencia arquivos offline e compara arquivos online e offline
 const { iniciaBuscaSkips } = require('./services/searchService'); // Inicia busca por arquivos online
@@ -21,6 +21,7 @@ const { setaServidor } = require('./services/serverConfigService'); // Configura
 
 // Utilitários
 const { reset, tableLog, displayLogTable } = require('./utils/helpers'); // Reseta variáveis ou estados no início da execução
+const { agora } = require('./utils/helpers'); // Importação da função agora() do módulo helpers
 
 //==========================================================================================================================================================================//
 
@@ -28,9 +29,7 @@ const { reset, tableLog, displayLogTable } = require('./utils/helpers'); // Rese
 let projeto = '';
 let matrizArquivosOffline = [];
 let matrizComparaArquivos = [];
-let matrizOBIDs = [];
 let matrizURIs = [];
-let tamanhoTotal = 0; // Variável para armazenar o tamanho total dos arquivos processados
 let etapa1 = ''; // Marcador de tempo para início do processo
 let etapa9 = ''; // Marcador de tempo para fim do processo
 
@@ -43,7 +42,8 @@ async function main() {
 
   // Define o projeto e a pasta raiz com base nos argumentos fornecidos ao script
   projeto = process.argv.slice(2)[0];
-  const raiz = projeto === '83' ? 'D:\\BDOC' : projeto === '82' ? 'D:\\BDOC 82' : '';
+  // const raiz = projeto === '83' ? 'D:\\BDOC' : projeto === '82' ? 'D:\\BDOC 82' : '';
+  const raiz = projeto === '83' ? 'D:\\BDOC' : projeto === '82' ? 'C:\\Users\\nvmj\\PETROBRAS\\BUZIOS PPO IPO PRE-OP-P82 - 01 - INTEGRA OFFLINE' : '';
 
   if (!raiz) { // Verifica se o projeto é conhecido e tem uma pasta correspondente
     console.error('Projeto desconhecido:', projeto);
@@ -60,9 +60,16 @@ async function main() {
     browser = await initializeBrowser();
     const bearerToken = await getDevToolsData(browser, 'https://integra-ext.petrobras.com.br/INTEGRA/#/');
 
-    // Verifica a validade do token e, se inválido, reinicia o processo
-    const tokenValido = await verificaToken(bearerToken, browser, main);
-    if (!tokenValido) return; // Se o token não for válido, termina a execução
+    // Passa a função `main` como callback para reiniciar o fluxo, ajustando a integração com `verificaToken`.
+    const tokenValido = await verificaToken(bearerToken, browser, async () => {
+      console.log('[Integra]: Reiniciando o fluxo principal...');
+      await main(); // Chama novamente o fluxo principal
+    });
+
+    if (!tokenValido) {
+      console.log('[Integra]: Processo pausado para renovação de token.');
+      return; // Aguarda o reinício definido em `verificaToken`
+    }
 
     // Configura o servidor com o token e o projeto em execução
     await setaServidor(bearerToken, projeto);
@@ -78,8 +85,8 @@ async function main() {
 
     // Define o intervalo de índice para processamento específico dos arquivos comparados
     //Isto é útil quando queremos processar só uma parte da matriz. OffSet é onde a contagem começará. Este valor multiplica de 
-    const offSet = 1;
-    const numeroDeItens = 50;
+    const offSet = 5;
+    const numeroDeItens = 500;
 
     const indiceInicio = (1 * (offSet - 1) * numeroDeItens);   // Ponto de início do intervalo
     const indiceFim = (1 * offSet * numeroDeItens);      // Ponto de término do intervalo
@@ -88,84 +95,86 @@ async function main() {
     const limiteDeItens = matrizComparaArquivos.slice(indiceInicio, indiceFim);
 
     // Mapeia e processa os IDs dos arquivos, com controle de limite de tempo entre as promessas
-    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    //==========================================================================================================================================================================//
+    let delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    // //==========================================================================================================================================================================//
     // [ IDs ]
 
-    console.log(`IDs`);
+    agora(`Início IDs`);
 
-    const idResults = await Promise.allSettled(
-      limiteDeItens.map(async (item, index) => {
-        const nomeSemRevisao = item.split('_').slice(0, -1).join('_'); // Remove a última parte do nome (revisão)
+    let duration = '';
 
-        // Atrasa a execução
-        await delay(150 * (index + 1));
+    const idResults = [];
+    delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms)); // Função de delay
 
-        const startTime = performance.now(); // Captura o tempo de início em milissegundos
-        const result = await pegaID(nomeSemRevisao, bearerToken, index + indiceInicio); // Adiciona 'indiceInicio' ao 'index' para manter o índice original
-        const endTime = performance.now(); // Captura o tempo de término em milissegundos
+    for (let index = 0; index < limiteDeItens.length; index++) {
+      const item = limiteDeItens[index];
+      const nomeSemRevisao = item.split('_').slice(0, -1).join('_'); // Remove a última parte do nome (revisão)
+      await delay(180); // Aplica o delay de 180ms
 
-        const duration = (endTime - startTime).toFixed(2); // Calcula a diferença em milissegundos com 2 casas decimais
+      try {
+        const startTime = performance.now(); // Tempo inicial
+        const result = await pegaID(nomeSemRevisao, bearerToken, index + indiceInicio); // Chama a função
+        const endTime = performance.now(); // Tempo final
 
-        // Mostra no console o índice e a duração
-        console.log(`[${index}] Duração: ${duration}ms}`);
+        duration = (0.001 * (endTime - startTime)).toFixed(2); // Duração em segundos
+        //console.log(`[${index}] Duração: ${duration}s`);
 
-        return result;
-      })
-    );
-
+        idResults.push({ status: 'fulfilled', value: result });
+      } catch (error) {
+        console.error(`[${index}] Erro ao processar pegaID: ${error.message}`);
+        idResults.push({ status: 'rejected', reason: error });
+      }
+    }
+    agora(`Duração total Id: ${duration}s`)
+    console.log('IDs processados:', idResults.length);
     //==========================================================================================================================================================================//
     // [ OBIDs ]
 
     console.log(`OBIDs`);
 
     const obidResults = [];
-    let loopStartTime = performance.now(); // Tempo de início do loop
+    let loopStartTime = performance.now(); // Tempo de início do processamento
 
-    for (let index = 0; index < idResults.length; index++) {
-      const retornoId = idResults[index];
+    // Processa as IDs com um delay constante e limite de concorrência
+    await Promise.allSettled(
+      idResults.map((retornoId, index) =>
+        limit(async () => {
+          if (retornoId.status === 'fulfilled' && retornoId.value) {
+            await delay(180); // Delay fixo de 190 ms
 
-      if (retornoId.status === 'fulfilled' && retornoId.value) {
-        // Usando setTimeout para aguardar o delay
-        await delay(150 * (index + 1)); // Delay sequencial baseado no índice
+            try {
+              const startTime = performance.now();
+              const result = await pegaOBID(retornoId.value.Id, retornoId.value, bearerToken);
 
-        try {
-          // Executa a função assíncrona e aguarda o resultado
-          const result = await limit(() =>
-            pegaOBID(retornoId.value.Id, retornoId.value, bearerToken)
-          );
+              duration = ((performance.now() - loopStartTime) / 1000).toFixed(2); // Duração desde o início do processamento
+              const name = Array.isArray(result) && result[1]?.Name ? result[1].Name : "N/A";
 
-          const currentTime = performance.now(); // Tempo atual
-          const durationFromLoopStart = (0.001 * (currentTime - loopStartTime)).toFixed(2); // Diferença desde o início do loop
+              //console.log(`[${index}] Duração: ${duration}s, Name: ${name}`);
 
-          // Extrai o campo Name do resultado, se existir
-          const name = Array.isArray(result) && result[1]?.Name ? result[1].Name : "N/A";
-
-          // Mostra no console o índice, a duração desde o início do loop, e o Name
-          console.log(`[${index}] Duração: ${durationFromLoopStart}s, Name: ${name}`);
-
-          // Adiciona o resultado com status ao array
-          obidResults.push({ status: 'fulfilled', value: result });
-        } catch (error) {
-          console.error(`[${index}] Erro ao processar pegaOBID: ${error.message}`);
-          obidResults.push({ status: 'rejected', reason: error });
-        }
-      }
-    }
+              obidResults.push({ status: 'fulfilled', value: result });
+            } catch (error) {
+              console.error(`[${index}] Erro ao processar pegaOBID: ${error.message}`);
+              obidResults.push({ status: 'rejected', reason: error });
+            }
+          }
+        })
+      )
+    );
 
     // Constrói a matriz de OBIDs a partir dos resultados bem-sucedidos
     const matrizOBIDs = obidResults
-      .filter(result => result.status === 'fulfilled' && result.value) // Verifica o status e valor
-      .map(result => result.value); // Extrai o valor do resultado
+      .filter(result => result.status === 'fulfilled' && result.value)
+      .map(result => result.value);
 
+    console.log(`Duração total OBId: ${duration}s`);
     console.log('OBIDs processados:', matrizOBIDs.length);
-
 
     //==========================================================================================================================================================================//
     // [ URIs ]
 
+    console.log(`URIs`);
     loopStartTime = performance.now(); // Tempo de início do loop
-    const uriResults = await Promise.allSettled(
+    let uriResults = await Promise.allSettled(
       matrizOBIDs
         .filter(obid => {
           // Garante que obid seja um array e tenha o primeiro elemento
@@ -174,9 +183,7 @@ async function main() {
         })
         .map(async (obid, index) => {
           // Atrasa a execução em 150ms por índice
-          await delay(150 * (index + 1));
-
-          const startTime = performance.now(); // Captura o tempo de início para cada iteração
+          await delay(180 * (index + 1));
 
           try {
             // Executa a função assíncrona e aguarda o resultado
@@ -186,9 +193,7 @@ async function main() {
             const durationFromLoopStart = (0.001 * (endTime - loopStartTime)).toFixed(2); // Diferença desde o início do loop
 
             // Mostra no console o índice, o OBID processado e o tempo de execução desde o início do loop
-            console.log(
-              `[${index}] Duração: ${durationFromLoopStart}s, OBID: ${obid[0]}`
-            );
+            //console.log(`[${index}] Duração: ${durationFromLoopStart}s, OBID: ${obid[0]}`);
 
             return resultado;
           } catch (error) {
@@ -227,7 +232,7 @@ async function main() {
             if (uri.URI) {
               extMatch = uri.URI.match(/.*\.(\w+)$/); // Extrai a extensão do arquivo
             } else {
-              console.warn(`Aviso: URI ausente em: ${JSON.stringify(uri)}`);
+              console.warn(`URI ausente em: ${JSON.stringify(uri.Name)}`);
             }
           } catch (error) {
             console.error(`Erro ao extrair extensão da URI: ${uri.URI}. Detalhes: ${error.message}`);

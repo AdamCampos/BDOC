@@ -22,6 +22,12 @@ async function pegaContagemSkips(token, projeto) {
 
     for (let attempts = 1; attempts <= maxRetries; attempts++) {
       try {
+
+        // Adiciona o delay entre requisições
+        if (attempts > 1) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+
         const response = await axiosInstance.get(url, {
           headers: { 'Authorization': token },
         });

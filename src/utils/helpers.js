@@ -41,7 +41,7 @@ function getCurrentTime() {
     const horas = agora.getHours().toString().padStart(2, '0');
     const minutos = agora.getMinutes().toString().padStart(2, '0');
     const segundos = agora.getSeconds().toString().padStart(2, '0');
-    return `${dia}${mes}-${horas}:${minutos}:${segundos}`;
+    return `${dia}/${mes} ${horas}:${minutos}:${segundos}`;
 }
 
 // Função para personalizar o console.log
@@ -68,8 +68,8 @@ function displayLogTable() {
 }
 
 // Função para exibir o horário atual como uma mensagem de log (pode ser usada de forma independente)
-function agora() {
-    console.log(getCurrentTime());
+function agora(texto) {
+    console.log(getCurrentTime(), texto);
 }
 
 module.exports = { reset, PromiseTimeout, consoleLog, getCurrentTime, tableLog, displayLogTable, agora };

@@ -24,23 +24,29 @@ function calculaToken(token) {
  * @param {Function} main - Função principal a ser reiniciada em caso de renovação de token.
  * @returns {Promise<boolean>} - Retorna true se o token é válido, false se precisar renovar.
  */
-async function verificaToken(token, browser, main) {
+async function verificaToken(token, browser, reiniciarFluxo) {
   if (!token) {
-    console.log('Erro ou timeout: Token não capturado em 2 minutos');
+    console.log('[Token Manager]: Token não capturado. Reiniciando o processo em 2 minutos...');
     await browser.close();
-    setTimeout(main, 120000);
+    setTimeout(reiniciarFluxo, 120000); // Reinicia após 2 minutos
     return false;
   }
 
   const expira = calculaToken(token);
-  if (expira < 5) {
-    console.log('Renovando o token...');
+  if (expira < 10) {
+    console.log(`[Token Manager]: Token expirando em ${expira} minutos. Renovando...`);
     await browser.close();
-    setTimeout(main, (expira + 1) * 60000);
+
+    // Aguarda um tempo proporcional ao tempo restante e reinicia o processo
+    setTimeout(() => {
+      console.log('[Token Manager]: Reiniciando o processo após renovação do token.');
+      reiniciarFluxo();
+    }, Math.max(1000, (expira + 0.1) * 60000)); // Garante pelo menos 1 segundo de espera
+
     return false;
   }
 
-  return true;
+  return true; // Token válido
 }
 
 // Exporta as funções como módulo

@@ -1,0 +1,1 @@
+﻿& java -jar "D:\BDOC 82\CLI.jar" "D:\BDOC 82\Desordenado" "D:\BDOC 82" true
